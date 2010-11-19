@@ -1,0 +1,22 @@
+{
+  "name": "はてブコメ",
+  "version": "1.0",
+  "description": "はてなブックマークのコメントをウィンドウ下部に流します。",
+  "icons": { "48": "images/hatebu_07.png"},
+  "background_page": "background.html",
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["jquery-1.4.3.min.js","jquery.li-scroller.1.0.js","contentscript.js"]
+    }
+  ],
+  "browser_action": {
+    "default_icon": "images/hatebu_07.png",
+    "default_title": "はてブコメ ON/OFF"
+  },
+  "permissions": [
+    "tabs",
+    "http://b.hatena.ne.jp/"
+  ]
+}

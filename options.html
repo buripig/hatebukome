@@ -1,0 +1,206 @@
+<html>
+<head>
+<title>はてブコメ オプション</title>
+<script src="jquery-1.4.3.min.js" type="text/javascript"></script>
+<style type="text/css">
+table.options{
+  border-spacing: 0px 4px;
+  border: none;
+  margin-top: 10px;
+}
+table.options th, table.options td, table.options caption{
+  padding: 4px;
+  text-align: left;
+}
+table.options caption {
+  border: none;
+  font-weight: bold;
+}
+table.options th{
+  border-spacing: 0px;
+  border: solid 1px #333;
+  font-weight: normal;
+  -webkit-border-radius: 8px 0px 0px 8px;
+}
+table.options td{
+  border-spacing: 0px;
+  border: solid 1px #333;
+  border-left: none;
+  -webkit-border-radius: 0px 8px 8px 0px;
+}
+span.range_label{
+  font-size: 80%;
+  vertical-align: 50%;
+  margin-right: 3px;
+  margin-left: 3px;
+}
+span#comment_num_value{
+  font-weight: bold;
+  vertical-align: 35%;
+  margin-left: 10px;
+}
+div.ignore_url{
+  margin-top: 2px;
+}
+div.ignore_url a{
+  color: red;
+  font-weight: bold;
+  cursor: pointer;
+}
+div.attension{
+  font-size: 80%;
+  color: red;
+  font-style: italic;
+}
+span.saved{
+  color: blue;
+  font-weight: bold;
+  margin-left: 10px;
+}
+#close_button{
+  width: 18px;
+  height: 18px;
+  margin-right: 3px;
+}
+</style>
+</head>
+<body>
+
+<table class="options">
+  <caption>はてブコメ 設定</caption>
+  <col width="300"/>
+  <col width="600"/>
+  <tr>
+    <th>取得コメント数上限</th>
+    <td>
+      <div>
+        <span class="range_label">１０</span><input id="comment_num" type="range" name="comment_num" min="10" max="101" value="" step="1"><span class="range_label">無制限</span>
+        <span id="comment_num_value"></span>
+        <span id="comment_num_message"></span>
+      </div>
+      <div class="attension">
+        取得コメント数上限を増やすとCPU負荷が高くなります。
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <th>スクロールスピード</th>
+    <td>
+      <span class="range_label">遅い</span><input id="scroll_speed" type="range" name="scroll_speed" min="1" max="7" value="" step="1"><span class="range_label">速い</span>
+      <span id="scroll_speed_message"></span>
+    </td>
+  </tr>
+  <tr>
+    <th>コメントが1周したら</th>
+    <td>
+      <input id="loop_true" type="radio" name="loop" value="true"><label for="loop_true">ループする</label>
+      <input id="loop_false" type="radio" name="loop" value="false"><label for="loop_false">閉じる</label>
+      <span id="loop_message"></span>
+    </td>
+  </tr>
+  <tr>
+    <th><img id="close_button" />を押すと<br>「はてブコメを表示しないURL」に追加</th>
+    <td>
+      <input id="url_auto_add_true" type="radio" name="url_auto_add" value="true"><label for="url_auto_add_true">する</label>
+      <input id="url_auto_add_false" type="radio" name="url_auto_add" value="false"><label for="url_auto_add_false">しない</label>
+      <span id="url_auto_add_message"></span>
+    </td>
+  </tr>
+  <tr>
+    <th>はてブコメを表示しないURL</th>
+    <td>
+      <div>
+        <input id="ignore_url" type="url" name="ignore_url" value="" size="50" placeholder="URL *使用可 例: http://foo.jp/bar  http://*.jp/*"/>
+        <input id="add_ignore_url" type="button" value="追加">
+        <span id="ignore_urls_message"></span>
+      </div>
+      <div id="ignore_urls"></div>
+    </td>
+  </tr>
+</table>
+<div>
+  <input id="clear_all_options" type="button" value="全て初期値に戻す"/>
+  <span id="clear_all_options_message"></span>
+</div>
+
+<script type="text/javascript">
+var bp = chrome.extension.getBackgroundPage();
+
+$(function(){
+  $("#close_button").attr("src", chrome.extension.getURL("images/close-blue.png"));
+  
+  initForms();
+  
+  $("#comment_num").change(function(){
+    var v = parseInt($(this).val(), 10);
+    $("#comment_num_value").text(v == 101 ? "無制限" : v);
+    bp.setCommentNumOption(v);
+    savedMessage("comment_num_message");
+  });
+  $("#scroll_speed").change(function(){
+    bp.setScrollSpeedOption(parseInt($(this).val(), 10));
+    savedMessage("scroll_speed_message");
+  });
+  $("#loop_true").click(function(){
+    bp.setLoopOption(true);
+    savedMessage("loop_message");
+  });
+  $("#loop_false").click(function(){
+    bp.setLoopOption(false);
+    savedMessage("loop_message");
+  });
+  $("#url_auto_add_true").click(function(){
+    bp.setUrlAutoAddOption(true);
+    savedMessage("url_auto_add_message");
+  });
+  $("#url_auto_add_false").click(function(){
+    bp.setUrlAutoAddOption(false);
+    savedMessage("url_auto_add_message");
+  });
+  $("#add_ignore_url").click(function(){
+    var url = $("#ignore_url").val();
+    if(url == "") return;
+    bp.addIgnoreUrlsOption(url);
+    $("#ignore_url").val("");
+    initIgnoreUrls();
+    savedMessage("ignore_urls_message");
+  });
+  $("#clear_all_options").click(function(){
+    if(confirm("全ての設定を初期状態に戻します。\nよろしいですか？")){
+      bp.clearAllOptions();
+      initForms();
+      savedMessage("clear_all_options_message");
+    }
+  });
+});
+
+function initForms(){
+  $("#comment_num").val(bp.getCommentNumOption());
+  $("#comment_num_value").text($("#comment_num").val() == 101 ? "無制限" : $("#comment_num").val());
+  $("#scroll_speed").val(bp.getScrollSpeedOption());
+  $(bp.getLoopOption() ? "#loop_true" : "#loop_false").attr("checked", "checked");
+  $(bp.getUrlAutoAddOption() ? "#url_auto_add_true" : "#url_auto_add_false").attr("checked", "checked");
+  initIgnoreUrls();
+}
+function initIgnoreUrls(){
+  var ignore_urls = $("#ignore_urls");
+  ignore_urls.empty();
+  $.each(bp.getIgnoreUrlsOption(), function(i, url){
+    var div = $('<div class="ignore_url"/>');
+    div.append($("<a />").text("×").click(function(){
+      bp.removeIgnoreUrlsOption($(this).next().text());
+      initIgnoreUrls();
+      savedMessage("ignore_urls_message");
+    }));
+    div.append($("<span />").text(url));
+    ignore_urls.append(div);
+  });
+}
+function savedMessage(elemId){
+  $("#" + elemId + " span.saved").remove();
+  $("#" + elemId).append('<span class="saved">Saved</span>');
+  $("#" + elemId + " span.saved").fadeOut(1500);
+}
+</script>
+</body>
+</html>

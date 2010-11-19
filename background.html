@@ -1,0 +1,170 @@
+<html>
+<script src="jquery-1.4.3.min.js" type="text/javascript"></script>
+<script>
+/*
+ * Events
+*/
+$(function(){
+  updateBadge();
+});
+chrome.browserAction.onClicked.addListener(function(tab){
+  toggleDisabledOption();
+  var disabled = getDisabledOption();
+  chrome.windows.getAll({populate: true}, function(windows){
+    $.each(windows, function(i, window){
+      $.each(window.tabs, function(j, tab){
+        if(disabled){
+          chrome.tabs.sendRequest(tab.id, {message: "close"});
+        }else{
+          open(tab);
+        }
+      });
+    });
+  });
+  updateBadge();
+});
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
+  if(getDisabledOption()) return;
+  if(changeInfo.status != "complete") return;
+  if(isIgnoreUrl(tab.url)) return;
+  open(tab);
+});
+chrome.tabs.onSelectionChanged.addListener(function(tabId, selectInfo) {
+  chrome.tabs.getAllInWindow(selectInfo.windowId, function(tabs){
+    $.each(tabs, function(i, tab){
+      chrome.tabs.sendRequest(tab.id, tab.id == tabId ? {message: "start"} : {message: "stop"});
+    });
+  })
+});
+chrome.extension.onRequest.addListener(
+  function(request, sender, sendResponse) {
+    if(request.type == "addIgnoreUrl"){
+      addIgnoreUrlsOption(request.url);
+    }
+  }
+);
+
+/*
+ * Functions
+*/
+function open(tab){
+  $.ajax({
+    type: "GET",
+    url: "http://b.hatena.ne.jp/entry/jsonlite/" + tab.url,
+    success: function(res){
+      if(res == null) return;
+      var bookmarks = $.grep(res.bookmarks, function(e, i){return e.comment != "";});
+      if(bookmarks.length == 0) return;
+      var cn = getCommentNumOption();
+      if(cn != 101 && bookmarks.length > cn){
+        var arr = new Array();
+        for(var i = 0;i < cn;i++){
+          arr[i] = bookmarks[i];
+        }
+        bookmarks = arr;
+      }
+      chrome.tabs.sendRequest(tab.id, {message: "open", tab: tab, bookmarks: bookmarks, loop: getLoopOption(), urlAutoAdd: getUrlAutoAddOption(), travelocity: getTravelocity()});
+    }
+  });
+}
+
+function isIgnoreUrl(url){
+  var ignores = getIgnoreUrlsOption();
+  if($.inArray(url, ignores) != -1) return true;
+  var match = false;
+  $.each(ignores, function(i, ignore){
+    if(ignore.indexOf("*") == -1) return;
+    var regex = new RegExp(ignore.replace(/\./g, "\\.").replace(/\//g, "\\/").replace(/\*/g, ".*"));
+    match = url.match(regex) != null;
+  });
+  return match;
+}
+
+/*
+ * Options
+*/
+function getOption(key, defval){
+  var val = localStorage[key];
+  return val == undefined ? defval : JSON.parse(val);
+}
+function setOption(key, val){
+  localStorage[key] = JSON.stringify(val);
+}
+function getDisabledOption(){
+  return getOption("disabled", false);
+}
+function setDisabledOption(val){
+  setOption("disabled", val);
+}
+function toggleDisabledOption(){
+  setDisabledOption(!getDisabledOption());
+}
+function getCommentNumOption(){
+  return getOption("comment_num", 30);
+}
+function setCommentNumOption(val){
+  setOption("comment_num", val);
+}
+function getScrollSpeedOption(){
+  return getOption("scroll_speed", 4);
+}
+function setScrollSpeedOption(val){
+  setOption("scroll_speed", val);
+}
+function getTravelocity(){
+  var arr = {1: 0.05, 2: 0.065, 3: 0.08, 4: 0.1, 5: 0.13, 6: 0.18, 7: 0.25};
+  return arr[getScrollSpeedOption()];
+}
+function getLoopOption(){
+  return getOption("loop", true);
+}
+function setLoopOption(val){
+  setOption("loop", val);
+}
+function getUrlAutoAddOption(){
+  return getOption("url_auto_add", true);
+}
+function setUrlAutoAddOption(val){
+  setOption("url_auto_add", val);
+}
+function getIgnoreUrlsOption(){
+  return getOption("ignore_urls", new Array());
+}
+function setIgnoreUrlsOption(val){
+  setOption("ignore_urls", val);
+}
+function addIgnoreUrlsOption(url){
+  var urls = getIgnoreUrlsOption();
+  if($.inArray(url, urls) != -1) return;
+  urls.unshift(url);
+  setIgnoreUrlsOption(urls);
+}
+function removeIgnoreUrlsOption(url){
+  var urls = getIgnoreUrlsOption();
+  if($.inArray(url, urls) == -1) return;
+  urls = $.grep(urls, function(e, i){return e != url;});
+  setIgnoreUrlsOption(urls);
+}
+function clearAllOptions(){
+  localStorage.removeItem("comment_num");
+  localStorage.removeItem("scroll_speed");
+  localStorage.removeItem("loop");
+  localStorage.removeItem("url_auto_add");
+  localStorage.removeItem("ignore_urls");
+}
+
+/*
+ * Badge
+*/
+function updateBadge(){
+  if(getDisabledOption()){
+    chrome.browserAction.setBadgeText({text: "OFF"});
+    chrome.browserAction.setBadgeBackgroundColor({color: [150,150,150,255]});
+  }else{
+    chrome.browserAction.setBadgeText({text: "ON"});
+    chrome.browserAction.setBadgeBackgroundColor({color: [0,220,0,255]});
+  }
+}
+
+</script>
+</html>
